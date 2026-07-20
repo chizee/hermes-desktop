@@ -737,6 +737,8 @@ const hermesAPI = {
   restartGateway: (profile?: string): Promise<boolean> =>
     ipcRenderer.invoke("restart-gateway", profile),
   gatewayStatus: (): Promise<boolean> => ipcRenderer.invoke("gateway-status"),
+  setNativeAppearance: (source: "dark" | "light" | "system"): Promise<void> =>
+    ipcRenderer.invoke("set-native-appearance", source),
   dashboardStatus: (profile?: string): Promise<DashboardStatus> =>
     ipcRenderer.invoke("dashboard-status", profile),
   freshDashboardWsUrl: (profile?: string): Promise<string> =>

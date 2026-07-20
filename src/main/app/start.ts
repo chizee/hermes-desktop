@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session, shell } from "electron";
+import { app, BrowserWindow, nativeTheme, session, shell } from "electron";
 import { join } from "path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import icon from "../../../resources/icon.png?asset";
@@ -143,6 +143,10 @@ function openExternalUrl(rawUrl: unknown): void {
 
 function createWindow(): void {
   const rendererHtmlPath = join(__dirname, "../renderer/index.html");
+  // Default the vibrancy material to dark (the app's default theme) so the
+  // first paint isn't a light, milky frost; the renderer overrides this to
+  // match the stored theme as soon as ThemeProvider mounts.
+  nativeTheme.themeSource = "dark";
   mainWindow = new BrowserWindow({
     width: 1100,
     height: 850,
@@ -152,8 +156,17 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : undefined,
+    // macOS: translucent window material so the sidebar reads as frosted glass.
+    // The material's light/dark tone follows `nativeTheme.themeSource`, which
+    // the renderer keeps in step with the app theme (default dark below) — so a
+    // dark theme never renders a light, milky sidebar.
     ...(process.platform === "darwin"
-      ? { trafficLightPosition: { x: 16, y: 16 } }
+      ? {
+          trafficLightPosition: { x: 16, y: 16 },
+          vibrancy: "under-window" as const,
+          visualEffectState: "active" as const,
+          backgroundColor: "#00000000",
+        }
       : {}),
     ...(process.platform === "linux" ? { icon } : {}),
     webPreferences: {

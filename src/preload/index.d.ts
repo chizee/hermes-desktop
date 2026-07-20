@@ -520,6 +520,7 @@ interface HermesAPI {
   stopGateway: () => Promise<boolean>;
   restartGateway: (profile?: string) => Promise<boolean>;
   gatewayStatus: () => Promise<boolean>;
+  setNativeAppearance: (source: "dark" | "light" | "system") => Promise<void>;
   dashboardStatus: (profile?: string) => Promise<DashboardStatus>;
   freshDashboardWsUrl: (profile?: string) => Promise<string>;
   startDashboard: (profile?: string) => Promise<DashboardStatus>;

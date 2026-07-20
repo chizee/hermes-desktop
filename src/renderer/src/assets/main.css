@@ -534,9 +534,38 @@ body {
   background: var(--bg-primary);
 }
 
+/* ── Translucent sidebar (macOS vibrancy) ──
+   On the main screen the shell goes transparent so the window material shows
+   through the sidebar as frosted glass. The material's tone tracks the theme
+   (see ThemeProvider → nativeTheme.themeSource), so a dark theme gets a dark
+   frost, never a milky light one. Only the sidebar is translucent — the content
+   pane stays opaque and readable. Gated to mac + main screen in App.tsx, so
+   onboarding and other platforms are untouched. */
+body:has(.shell-vibrant),
+#root:has(.shell-vibrant) {
+  background: transparent;
+}
+.app.shell-vibrant {
+  background: transparent;
+}
+.app.shell-vibrant .content {
+  background: var(--bg-primary);
+  /* Transparent window → macOS no longer masks the opaque content to the
+     window shape, so round the top-right corner ourselves (the sidebar owns
+     top-left, the status bar owns the bottom). `.content` is overflow:hidden,
+     so the tab strip clips to it. */
+  border-radius: 0 16px 0 0;
+}
+.app.shell-vibrant .sidebar {
+  background: color-mix(in srgb, var(--bg-secondary) 55%, transparent);
+}
+.app.shell-vibrant .status-bar {
+  background: color-mix(in srgb, var(--bg-secondary) 55%, transparent);
+}
+
 .drag-region {
   -webkit-app-region: drag;
-  height: 28px;
+  height: 34px;
   width: 100%;
   position: fixed;
   top: 0;
@@ -1399,10 +1428,85 @@ body {
 /* ========================================================================
    LAYOUT (Sidebar + Content)
    ======================================================================== */
+/* Column wrapper: the sidebar+content row on top, the status strip pinned
+   full-width beneath it. */
+.layout-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 .layout {
   display: flex;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
+}
+
+/* ── Bottom system status strip ──
+   Native desktop affordance: gateway/connection state, active model, and skill
+   count that were otherwise hidden, plus real keyboard hints. */
+.status-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 26px;
+  padding: 0 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  /* Full-width footer owns the window's bottom edge → round both bottom
+     corners to follow the window. */
+  border-radius: 0 0 16px 16px;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.status-bar-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.status-bar-hints {
+  flex-shrink: 0;
+}
+.status-item {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.status-strong {
+  color: var(--text-secondary);
+}
+.status-sep {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot.online {
+  background: var(--success, #3fb950);
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--success, #3fb950) 22%, transparent);
+}
+.status-dot.offline {
+  background: var(--text-muted);
+}
+.status-kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  color: var(--text-secondary);
 }
 
 .sidebar {
@@ -1418,9 +1522,10 @@ body {
   transition:
     width var(--transition),
     padding var(--transition);
-  /* Flush full-height panel: square right edge against the content, left
-     corners kept rounded to follow the window's rounded corners. */
-  border-radius: 16px 0 0 16px;
+  /* Flush full-height panel. Only the top-left corner follows the window now —
+     the full-width status bar owns the window's bottom edge, so the sidebar's
+     bottom-left is square against it. */
+  border-radius: 16px 0 0 0;
 }
 
 .sidebar-collapsed .sidebar {
@@ -1430,10 +1535,12 @@ body {
 .sidebar-brand {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  /* Logo removed for a clean top — just the collapse toggle, parked top-right
+     opposite the traffic lights. */
+  justify-content: flex-end;
   gap: 10px;
-  padding: 20px 14px 20px 20px;
-  margin-top: 25px;
+  padding: 4px 12px 2px;
+  margin-top: 12px;
 }
 
 .sidebar-logo {
@@ -2497,17 +2604,103 @@ body {
 .profile-switcher {
   position: relative;
   width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .profile-switcher.compact {
   width: 40px;
 }
 
+.profile-switch-btn {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.profile-switch-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* Modal to switch the active profile. */
+.profile-switch-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.45);
+  animation: profileSwitchOverlayIn 0.14s ease;
+}
+.profile-switch-modal {
+  width: 360px;
+  max-width: 100%;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  background: color-mix(in srgb, var(--bg-secondary) 92%, transparent);
+  backdrop-filter: blur(30px) saturate(1.5);
+  -webkit-backdrop-filter: blur(30px) saturate(1.5);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 24px 60px -16px rgba(0, 0, 0, 0.6),
+    0 8px 24px -12px rgba(0, 0, 0, 0.45);
+  animation: profileSwitchModalIn 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.profile-switch-title {
+  padding: 8px 10px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+.profile-switch-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+@keyframes profileSwitchOverlayIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes profileSwitchModalIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .profile-switcher-trigger {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding: 8px 10px;
   background: none;
   border: 1px solid transparent;
@@ -2852,6 +3045,9 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  /* Hairline seam so the content pane reads as a distinct material layer above
+     the (darker / translucent) sidebar rather than one flat black field. */
+  border-inline-start: 1px solid var(--border);
 }
 
 /* ========================================================================
@@ -3688,42 +3884,88 @@ body {
 .chat-fast-active {
   opacity: 1;
   color: #f59e0b;
+  background: color-mix(in srgb, #f59e0b 14%, transparent);
 }
 
 .chat-fast-active:hover {
   opacity: 1;
+  background: color-mix(in srgb, #f59e0b 20%, transparent);
 }
 
 .chat-fast-popover {
-  display: none;
   position: absolute;
-  bottom: calc(100% + 8px);
+  bottom: calc(100% + 10px);
   right: 0;
   z-index: 100;
-  width: 220px;
-  padding: 10px 12px;
-  background: var(--bg-tertiary, var(--bg-secondary));
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  width: 244px;
+  padding: 12px 14px;
+  /* Same floating glass material as the pickers. */
+  background: color-mix(in srgb, var(--bg-secondary) 85%, transparent);
+  backdrop-filter: blur(28px) saturate(1.5);
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 24px 60px -16px rgba(0, 0, 0, 0.6),
+    0 8px 24px -12px rgba(0, 0, 0, 0.45);
+  /* Fade + settle instead of a hard show/hide. */
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px) scale(0.98);
+  transform-origin: bottom right;
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0.16s;
   pointer-events: none;
 }
 
+.chat-fast-popover-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.chat-fast-popover-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  /* Off state: a quiet neutral chip so the bolt reads clearly. */
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+}
+/* On state: a solid amber badge with a dark glyph — high contrast, and it
+   signals "active" the way the toggle button does. */
+.chat-fast-active-popover .chat-fast-popover-icon {
+  color: #3a2900;
+  background: #f59e0b;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #f59e0b 20%, transparent);
+}
+
 .chat-fast-popover strong {
-  display: block;
   font-size: 12px;
-  margin-bottom: 4px;
+  font-weight: 600;
   color: var(--text-primary);
 }
 
 .chat-fast-popover span {
+  display: block;
   font-size: 11px;
-  line-height: 1.4;
+  line-height: 1.5;
   color: var(--text-secondary);
 }
 
-.chat-fast-wrapper:hover .chat-fast-popover {
-  display: block;
+.chat-fast-wrapper:hover .chat-fast-popover,
+.chat-fast-wrapper:focus-within .chat-fast-popover {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
 }
 
 /* Context folder control (issue #27) */
@@ -3858,18 +4100,21 @@ body {
 .chat-suggestion {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border-radius: 20px;
-  border: 1px solid var(--border);
-  background: var(--bg-secondary);
+  gap: 8px;
+  padding: 8px 14px;
+  /* Quiet fill, not an outlined pill: a hairline ring (inset) and native
+     rounded-rect radius read as a desktop control rather than a web chip. */
+  border-radius: var(--radius-md);
+  border: none;
+  background: color-mix(in srgb, var(--bg-secondary) 70%, transparent);
+  box-shadow: inset 0 0 0 1px var(--border);
   color: var(--text-secondary);
   font-size: 13px;
   cursor: pointer;
   transition:
     background 0.15s ease,
     color 0.15s ease,
-    border-color 0.15s ease;
+    box-shadow 0.15s ease;
 }
 
 .chat-suggestion svg {
@@ -3877,9 +4122,9 @@ body {
 }
 
 .chat-suggestion:hover {
-  background: var(--bg-elevated);
+  background: var(--bg-hover);
   color: var(--text-primary);
-  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--border-bright);
 }
 
 /* Messages */
@@ -6304,6 +6549,144 @@ body {
   flex-shrink: 0;
 }
 
+/* ── Reasoning effort as a Faster⟷Smarter segmented slider ──
+   A tactile dot-rail (knob on the current level) instead of a plain option
+   list — reads as a native macOS control. Lives inside the glass dropdown. */
+.chat-effort {
+  width: 240px;
+  padding: 10px 12px 12px;
+}
+.chat-effort-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.chat-effort-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+}
+.chat-effort-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.chat-effort-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.chat-effort-help {
+  display: inline-flex;
+  color: var(--text-muted);
+  cursor: help;
+  flex-shrink: 0;
+  transition: color var(--transition);
+  border-radius: 50%;
+  outline: none;
+}
+.chat-effort-help:hover,
+.chat-effort-help:focus-visible {
+  color: var(--text-secondary);
+}
+.chat-effort-help:focus-visible {
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+.chat-effort-track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 18px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  touch-action: none;
+  border-radius: 6px;
+  outline: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.chat-effort-track:focus-visible {
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+/* Rail spans between the first and last dot centres (each stop is 18px wide, so
+   its centre sits 9px in from the edge). */
+.chat-effort-rail {
+  position: absolute;
+  left: 9px;
+  right: 9px;
+  height: 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--text-muted) 30%, transparent);
+}
+.chat-effort-rail-fill {
+  position: absolute;
+  left: 9px;
+  height: 3px;
+  border-radius: 3px;
+  width: calc((100% - 18px) * var(--effort-frac, 0));
+  background: color-mix(in srgb, var(--accent-text) 55%, transparent);
+  transition: width 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.chat-effort-stop {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.chat-effort-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  opacity: 0.55;
+  transition:
+    width 0.15s ease,
+    height 0.15s ease,
+    background 0.15s ease,
+    opacity 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.chat-effort-stop:hover .chat-effort-dot {
+  opacity: 1;
+}
+.chat-effort-stop.passed .chat-effort-dot {
+  background: var(--accent-text);
+  opacity: 1;
+}
+/* Apex (Smarter end) always carries a hint of accent, like a target. */
+.chat-effort-stop.apex .chat-effort-dot {
+  background: var(--accent-text);
+  opacity: 0.9;
+}
+/* The knob on the current level. */
+.chat-effort-stop.active .chat-effort-dot {
+  width: 14px;
+  height: 14px;
+  background: var(--text-primary);
+  opacity: 1;
+  cursor: grab;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.45),
+    0 0 0 4px var(--accent-subtle);
+}
+.chat-effort-ends {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
 .chat-model-search-input,
 .chat-model-custom-input {
   box-sizing: border-box;
@@ -8472,34 +8855,52 @@ body {
   background: var(--accent-subtle);
 }
 
-/* Theme grid (VS Code-style theme picker) */
+/* Theme grid — compact, borderless cards; the selection is a ring, not a box
+   around every tile, so the grid reads calm. */
 .settings-theme-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
 }
 
 .settings-theme-card {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 8px;
-  background: var(--bg-primary);
-  border: 1.5px solid var(--border);
+  padding: 6px;
+  background: none;
+  border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition);
+  transition:
+    background var(--transition),
+    box-shadow var(--transition);
   text-align: left;
   font-family: var(--font-sans);
 }
 
 .settings-theme-card:hover {
-  border-color: var(--border-bright);
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
 }
 
 .settings-theme-card.active {
-  border-color: var(--accent);
   background: var(--accent-subtle);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+/* "N more…" tile — matches a card's footprint, quiet until hovered. */
+.settings-theme-more {
+  align-items: center;
+  justify-content: center;
+  min-height: 84px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+}
+.settings-theme-more:hover {
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
 
 /* Live preview rendered with the target theme's own variables */
@@ -8588,6 +8989,68 @@ body {
   font-size: 12px;
   color: var(--text-muted);
   margin-top: 2px;
+}
+
+/* Grouped preferences — one quiet card, hairline row dividers, macOS-style. */
+.settings-group {
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+  overflow: hidden;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 16px;
+}
+.settings-row + .settings-row {
+  border-top: 1px solid var(--border);
+}
+.settings-row-text {
+  min-width: 0;
+}
+.settings-row-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.settings-row-hint {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Segmented control (font, hardware accel) — a track with pill segments. */
+.settings-seg {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, #000 18%, transparent);
+}
+.settings-seg-btn {
+  padding: 5px 12px;
+  border: none;
+  background: none;
+  border-radius: calc(var(--radius-sm) - 1px);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--transition),
+    color var(--transition);
+}
+.settings-seg-btn:hover {
+  color: var(--text-primary);
+}
+.settings-seg-btn.active {
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+  color: var(--text-primary);
 }
 
 /* Language picker dropdown */
@@ -8837,19 +9300,28 @@ body {
 /* ── Global profile modal (80vw × 80vh) ─────────────────────────────── */
 .profile-modal-overlay {
   padding: 24px;
+  /* Lighter scrim so the frosted glass reads as translucent, not a flat panel. */
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .profile-modal {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   width: 80vw;
   height: 80vh;
   max-width: 1100px;
   max-height: 820px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-bright);
+  /* Frosted glass — same material language as the pickers: translucent tint +
+     blur, lifted on a soft ambient shadow instead of a hard border. */
+  background: color-mix(in srgb, var(--bg-secondary) 85%, transparent);
+  backdrop-filter: blur(30px) saturate(1.5);
+  -webkit-backdrop-filter: blur(30px) saturate(1.5);
+  border: 0.5px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 24px 60px -16px rgba(0, 0, 0, 0.6),
+    0 8px 24px -12px rgba(0, 0, 0, 0.45);
   overflow: hidden;
 }
 
@@ -8858,7 +9330,38 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 16px 22px;
-  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* Full-height left sidebar: avatar/name head + nav, spanning top to bottom. */
+.profile-modal-sidebar {
+  flex-shrink: 0;
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* The distinct rail shade lives here now, so it reaches both edges. */
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+.profile-modal-sidebar-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 16px 12px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+.profile-modal-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.profile-modal-topbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 18px 0;
   flex-shrink: 0;
 }
 
@@ -8889,7 +9392,7 @@ body {
 
 .profile-modal-close:hover {
   color: var(--text-primary);
-  background: var(--bg-tertiary);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
 
 /* Two-column body: identity/appearance left, detail/settings right. Scrolls
@@ -8902,13 +9405,12 @@ body {
 }
 
 .profile-modal-nav {
-  flex-shrink: 0;
-  width: 180px;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 20px 12px;
-  border-right: 1px solid var(--border);
+  padding: 4px 12px 16px;
   overflow-y: auto;
 }
 
@@ -8933,12 +9435,12 @@ body {
 }
 
 .profile-modal-nav-item:hover {
-  background: var(--bg-tertiary);
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
   color: var(--text-primary);
 }
 
 .profile-modal-nav-item.active {
-  background: var(--bg-tertiary);
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
   color: var(--text-primary);
   font-weight: 600;
 }
@@ -9039,17 +9541,24 @@ body {
   width: min(360px, 52vw);
   height: 36px;
   padding: 0 10px;
-  border: 1px solid var(--border-bright);
-  border-radius: var(--radius-sm);
-  background: var(--bg-primary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg-secondary) 90%, #000);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28);
   color: var(--text-primary);
   font: inherit;
   font-weight: 700;
+  transition:
+    box-shadow var(--transition),
+    border-color var(--transition);
 }
 
 .profile-modal-name-input:focus {
-  border-color: var(--accent);
   outline: none;
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.28),
+    0 0 0 3px var(--accent-subtle);
 }
 
 .profile-modal-tag {
@@ -9079,7 +9588,7 @@ body {
   gap: 7px;
   font-size: 12px;
   color: var(--text-secondary);
-  background: var(--bg-tertiary);
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
   padding: 6px 12px;
   border-radius: var(--radius-md);
 }
@@ -9175,7 +9684,6 @@ body {
   display: flex;
   justify-content: flex-end;
   padding: 14px 22px;
-  border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
 
@@ -9214,24 +9722,60 @@ body {
    right. Built on the same AppModal shell as the profile modal. */
 .settings-modal-overlay {
   padding: 24px;
+  /* Lighter scrim so the frosted glass reads as translucent. */
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .settings-modal {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   width: 80vw;
   height: 80vh;
   max-width: 1000px;
   max-height: 780px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-bright);
+  /* Frosted glass — same material as the pickers/profile modal. */
+  background: color-mix(in srgb, var(--bg-secondary) 85%, transparent);
+  backdrop-filter: blur(30px) saturate(1.5);
+  -webkit-backdrop-filter: blur(30px) saturate(1.5);
+  border: 0.5px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 24px 60px -16px rgba(0, 0, 0, 0.6),
+    0 8px 24px -12px rgba(0, 0, 0, 0.45);
   overflow: hidden;
   /* Chrome UI, not content: drag-selecting highlights nav labels and field
      captions, which looks broken. Copyable content opts back in below. */
   -webkit-user-select: none;
   user-select: none;
+}
+
+/* Full-height left sidebar: title head + grouped nav, spanning top to bottom
+   with a distinct lifted (lighter) rail shade. */
+.settings-modal-sidebar {
+  flex-shrink: 0;
+  width: 210px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+.settings-modal-sidebar-head {
+  padding: 18px 20px 12px;
+  flex-shrink: 0;
+}
+.settings-modal-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.settings-modal-topbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 18px 0;
+  flex-shrink: 0;
 }
 
 .settings-modal input,
@@ -9271,7 +9815,7 @@ body {
 
 .settings-modal-close:hover {
   color: var(--text-primary);
-  background: var(--bg-tertiary);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
 
 .settings-modal-layout {
@@ -9281,13 +9825,12 @@ body {
 }
 
 .settings-modal-nav {
-  flex-shrink: 0;
-  width: 210px;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 18px 12px;
-  border-right: 1px solid var(--border);
+  padding: 4px 12px 18px;
   overflow-y: auto;
 }
 
@@ -9327,12 +9870,12 @@ body {
 }
 
 .settings-modal-nav-item:hover {
-  background: var(--bg-tertiary);
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
   color: var(--text-primary);
 }
 
 .settings-modal-nav-item.active {
-  background: var(--bg-tertiary);
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
   color: var(--text-primary);
 }
 
@@ -9375,9 +9918,10 @@ body {
 .settings-card {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--border);
+  /* Light-based: a lifted translucent panel instead of a bordered box. */
+  border: none;
   border-radius: var(--radius-lg);
-  background: var(--bg-primary);
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
   overflow: hidden;
 }
 
@@ -9385,8 +9929,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--border);
+  padding: 16px 18px 8px;
 }
 
 .settings-card-icon {
@@ -9397,7 +9940,7 @@ body {
   height: 34px;
   flex-shrink: 0;
   border-radius: var(--radius-md);
-  background: var(--bg-tertiary);
+  background: color-mix(in srgb, var(--text-primary) 9%, transparent);
   color: var(--text-primary);
 }
 
@@ -9431,20 +9974,20 @@ body {
 
 .settings-card-badge.is-ok {
   color: var(--text-secondary);
-  background: var(--bg-tertiary);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
 
 .settings-card-badge.is-update {
   color: var(--accent, #4c8dff);
-  background: color-mix(in srgb, var(--accent, #4c8dff) 14%, transparent);
-  border-color: color-mix(in srgb, var(--accent, #4c8dff) 35%, transparent);
+  background: color-mix(in srgb, var(--accent, #4c8dff) 16%, transparent);
+  border-color: transparent;
 }
 
 .settings-card-body {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 18px;
+  padding: 8px 18px 18px;
 }
 
 /* Labelled metadata grid (version chips). */
@@ -9508,6 +10051,16 @@ body {
   gap: 6px;
 }
 
+/* Buttons inside cards go light-based too — a lifted fill, no stroke. */
+.settings-card .btn-secondary {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+.settings-card .btn-secondary:hover:not(:disabled) {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--text-primary) 13%, transparent);
+}
+
 .settings-card-actions-note {
   font-size: 12px;
   color: var(--text-secondary);
@@ -9519,8 +10072,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  border-top: 1px solid var(--border);
-  padding-top: 16px;
+  padding-top: 4px;
 }
 
 .settings-toggle-text {
