@@ -75,8 +75,10 @@ export function buildWorldActionSystemPrompt(agentName: string): string {
   ].join("\n");
 }
 
+// \r?\n: models/transports may emit CRLF newlines — a CRLF fence must still
+// parse (and be stripped) rather than leak protocol JSON into the chat.
 const BLOCK_RE = new RegExp(
-  "```" + WORLD_ACTION_TAG + "[ \\t]*\\n([\\s\\S]*?)```",
+  "```" + WORLD_ACTION_TAG + "[ \\t]*\\r?\\n([\\s\\S]*?)```",
   "gi",
 );
 

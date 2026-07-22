@@ -40,6 +40,15 @@ describe("world-action parsing", () => {
     ]);
   });
 
+  it("parses CRLF-formatted blocks (never leaks protocol JSON into chat)", () => {
+    const reply =
+      'Heading out.\r\n```world-action\r\n[{"do":"go_to","place":"bank"}]\r\n```';
+    const { text, actions } = parseWorldActions(reply);
+    expect(text).toBe("Heading out.");
+    expect(actions).toEqual([{ do: "go_to", place: "bank" }]);
+    expect(stripWorldActionBlocks(reply)).toBe("Heading out.");
+  });
+
   it("accepts a bare object as a one-item array", () => {
     const { actions } = parseWorldActions(
       '```world-action\n{"do":"go_to","place":"showroom"}\n```',

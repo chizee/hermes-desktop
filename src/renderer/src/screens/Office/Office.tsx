@@ -327,6 +327,14 @@ function Office({ visible, profile }: OfficeProps): React.JSX.Element {
         }
       } else {
         missionRef.current = null;
+        // The simulation gave up (interaction hold timed out) while the
+        // panel was still open: close it too, or the UI would keep serving
+        // an interaction whose agent has already walked home.
+        if (missionRepOpenRef.current) {
+          missionRepOpenRef.current = false;
+          setAutoAction(null);
+          setActiveRepId(null);
+        }
       }
     });
   }, [walkMode]);
